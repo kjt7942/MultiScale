@@ -5,7 +5,7 @@ OUT="${1:-release.jks}"
 ALIAS="${KEY_ALIAS:-grape}"
 PW="${KEYSTORE_PASSWORD:-$(openssl rand -hex 12)}"
 keytool -genkeypair -v -keystore "$OUT" -alias "$ALIAS" -keyalg RSA -keysize 2048 \
-  -validity 36500 -storepass "$PW" -keypass "$PW" -dname "CN=GrapeSorter, O=kjt7942, C=KR"
+  -validity 36500 -storepass "$PW" -keypass "$PW" -dname "CN=MultiScale, O=kjt7942, C=KR"
 base64 -w0 "$OUT" > "$OUT.b64"
 echo "KEYSTORE_PASSWORD=$PW"
 echo "KEY_PASSWORD=$PW"

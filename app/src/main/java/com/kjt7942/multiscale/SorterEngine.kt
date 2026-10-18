@@ -1,4 +1,4 @@
-package com.kjt7942.grapesorter
+package com.kjt7942.multiscale
 
 const val WEIGHT_STEP = 5                   // 5g 단위로 반올림해 표시/연산
 const val REFILL_WEIGHT_THRESHOLD = 300     // 잠금 중 비워진 저울에 이 이상 다시 찍히면 새 송이로 본다

@@ -1,4 +1,4 @@
-package com.kjt7942.grapesorter
+package com.kjt7942.multiscale
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -182,8 +182,8 @@ class Updater(private val ctx: Context) {
     }
 
     companion object {
-        const val ACTION_INSTALL_RESULT = "com.kjt7942.grapesorter.INSTALL_RESULT"
-        private const val USER_AGENT = "grape-sorter-app"
+        const val ACTION_INSTALL_RESULT = "com.kjt7942.multiscale.INSTALL_RESULT"
+        private const val USER_AGENT = "multiscale"
     }
 }
 

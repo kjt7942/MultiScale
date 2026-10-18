@@ -1,4 +1,4 @@
-package com.kjt7942.grapesorter
+package com.kjt7942.multiscale
 
 import org.junit.Assert.*
 import org.junit.Test

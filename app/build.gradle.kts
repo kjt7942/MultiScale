@@ -12,17 +12,17 @@ val appVersionCode: Int = (project.findProperty("appVersionCode") as String?)?.t
 val keystorePath: String? = System.getenv("KEYSTORE_PATH")
 
 android {
-    namespace = "com.kjt7942.grapesorter"
+    namespace = "com.kjt7942.multiscale"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.kjt7942.grapesorter"
+        applicationId = "com.kjt7942.multiscale"
         minSdk = 26
         targetSdk = 34
         versionCode = appVersionCode
         versionName = appVersionName
         // 앱이 새 버전을 찾아볼 GitHub 저장소 (owner/repo). 공개 저장소여야 한다.
-        buildConfigField("String", "UPDATE_REPO", "\"kjt7942/grape-sorter-app\"")
+        buildConfigField("String", "UPDATE_REPO", "\"kjt7942/multiscale\"")
     }
 
     signingConfigs {

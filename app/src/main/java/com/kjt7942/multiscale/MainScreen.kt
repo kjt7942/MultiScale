@@ -1,4 +1,4 @@
-package com.kjt7942.grapesorter
+package com.kjt7942.multiscale
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

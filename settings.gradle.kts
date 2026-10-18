@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GrapeSorter"
+rootProject.name = "MultiScale"
 include(":app")

@@ -1,4 +1,4 @@
-package com.kjt7942.grapesorter
+package com.kjt7942.multiscale
 
 /** index 는 1부터 시작하는 저울 번호. */
 data class Item(val index: Int, val weight: Int)

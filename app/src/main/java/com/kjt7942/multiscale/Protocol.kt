@@ -1,4 +1,4 @@
-package com.kjt7942.grapesorter
+package com.kjt7942.multiscale
 
 const val CHANNELS = 12
 const val PLAUSIBLE_MIN_G = -50      // 영점 뒤 이보다 낮게 나올 수 없다
