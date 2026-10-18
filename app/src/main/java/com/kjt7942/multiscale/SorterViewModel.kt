@@ -66,6 +66,9 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
     private var lastLed: List<Int>? = null
     private var lastLedSentMs = 0L
     private var autoInstallTried = false
+    // 박스 완성 후 새로 채울 저울: 다 찰 때까지 1초마다 다시 요청한다(블루투스 유실 대비).
+    private var fillTrays: Set<Int> = emptySet()
+    private var fillSentMs = 0L
     private var lastDataMs = 0L
     private var staleFed = false
     private var connected = false
@@ -434,10 +437,6 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         if (empty.isNotEmpty()) link.send("<E${empty.sorted().joinToString(",") { "${it + 1}" }}>\n")
         if (fill.isNotEmpty()) link.send("<F${fill.sorted().joinToString(",") { "${it + 1}" }}>\n")
     }
-
-    // 박스 완성 후 새로 채울 저울: 다 찰 때까지 1초마다 다시 요청한다(블루투스 유실 대비).
-    private var fillTrays: Set<Int> = emptySet()
-    private var fillSentMs = 0L
 
     private fun handleRefill() {
         engine.takeRefill()?.let {
