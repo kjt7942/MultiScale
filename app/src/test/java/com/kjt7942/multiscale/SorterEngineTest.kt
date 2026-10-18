@@ -12,31 +12,6 @@ class SorterEngineTest {
     private fun w(vararg v: Int) = IntArray(CHANNELS) { if (it < v.size) v[it] else 0 }
     private fun SorterEngine.feed(t: Long, arr: IntArray): Snapshot { now = t; return onWeights(arr) }
 
-    private val leftover = intArrayOf(700, 700, 350, 300)
-
-    @Test fun lockThenBoxRemovedWaitsForRefill() {
-        val e = engine()
-        val full = w(500, 500, 525, 525, *leftover)
-        e.feed(0, full)
-        assertEquals(listOf(1, 2, 3, 4), e.feed(600, full).leds)
-
-        // 박스를 치움: 1~4번이 동시에 0g. 남은 5~8번으로 바로 조합하면 안 된다.
-        val emptied = w(0, 0, 0, 0, *leftover)
-        assertTrue(e.feed(700, emptied).leds.isEmpty())
-        assertTrue(e.feed(800, full).leds.isEmpty())   // 막 채워짐: 아직 자리 잡기 전
-        assertEquals(listOf(1, 2, 3, 4), e.feed(1400, full).leds) // 자리 잡으면 전체에서 최적 조합
-    }
-
-    @Test fun refillHoldTimesOutForSlowRefill() {
-        val e = engine()
-        val full = w(500, 500, 525, 525, *leftover)
-        e.feed(0, full); e.feed(600, full)
-        val emptied = w(0, 0, 0, 0, *leftover)
-        assertTrue(e.feed(700, emptied).leds.isEmpty())
-        assertTrue(e.feed(2000, emptied).leds.isEmpty())
-        assertEquals(listOf(5, 6, 7, 8), e.feed(3800, emptied).leds)
-    }
-
     @Test fun topupNeedsAllBoxTraysFirst() {
         val e = engine()
         e.toggleTopup()

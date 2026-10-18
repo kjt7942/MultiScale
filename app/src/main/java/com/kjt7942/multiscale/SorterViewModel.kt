@@ -375,9 +375,12 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
     /** 테스트 모드에서만: 저울을 눌러 비우거나(0g) 새 송이를 올린다(500~1000g). */
     fun onTrayClick(i: Int) {
         if (!demo) {
-            // 실제 연결 상태: 무게가 있고 조합/보태기에 쓰이는 저울이면 아두이노에 '비우기'를 요청한다.
-            // (시뮬레이터 펌웨어 전용 명령: <E번호>, 번호는 1부터)
-            if (connected && ui.weights[i] > 0 && ui.roles[i] != Role.NONE) link.send("<E${i + 1}>\n")
+            // 실제 연결 상태(시뮬레이터 펌웨어 전용 명령, 번호는 1부터)
+            //  - 무게가 있고 조합/보태기에 쓰이는 저울: 비우기 <E번호>
+            //  - 0g 인 저울: 새 송이 채우기 <F번호>
+            if (!connected) return
+            if (ui.weights[i] == 0) link.send("<F${i + 1}>\n")
+            else if (ui.weights[i] > 0 && ui.roles[i] != Role.NONE) link.send("<E${i + 1}>\n")
             return
         }
         demoWeights[i] = if (demoWeights[i] > 0) 0 else Random.nextInt(500, 1001)
