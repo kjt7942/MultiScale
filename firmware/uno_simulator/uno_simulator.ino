@@ -1,4 +1,4 @@
-// MultiScale 테스트용 시뮬레이터 (Arduino Uno + HC-06)  v0.4
+// MultiScale 테스트용 시뮬레이터 (Arduino Uno + HC-06)  v0.5
 // 배선: HC-06 TX -> D2, HC-06 RX -> D3(분압 권장), VCC 5V, GND
 // 동작:
 //  - 12개 저울에 500~1000g 랜덤 무게를 채워 0.3초마다 <w1,...,w12> 로 보낸다.
@@ -21,6 +21,7 @@ int rndWeight() { return (int)random(100, 201) * 5; } // 500..1000, 5g 단위
 
 void handleLine() {
   line[len] = 0;
+  Serial.print(F("RX ")); Serial.println(line); // USB 시리얼 모니터(115200)로 받은 명령을 보여준다
   char *s = strchr(line, '<');
   if (!s) return;
   s++;
@@ -28,7 +29,7 @@ void handleLine() {
   if (!e) return;
   *e = 0;
   if (!strcmp(s, "TARE")) { bt.println(F("[SYSTEM] 영점 조절 완료")); return; }
-  if (!strcmp(s, "VER")) { bt.println(F("[VER] SIM-0.4")); return; }
+  if (!strcmp(s, "VER")) { bt.println(F("[VER] SIM-0.5")); return; }
   if (s[0] == 'E' || s[0] == 'F') {
     bool fill = (s[0] == 'F');
     for (char *tok = strtok(s + 1, ","); tok; tok = strtok(NULL, ",")) {
@@ -41,6 +42,7 @@ void handleLine() {
 }
 
 void setup() {
+  Serial.begin(115200);
   bt.begin(9600);
   randomSeed(analogRead(A0) + micros());
   for (uint8_t i = 0; i < N; i++) w[i] = rndWeight();

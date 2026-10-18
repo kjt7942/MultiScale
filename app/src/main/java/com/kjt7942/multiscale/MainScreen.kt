@@ -373,7 +373,8 @@ fun ManageDialog(vm: SorterViewModel, ui: UiState, p: Palette, onClose: () -> Un
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     "앱 v${BuildConfig.VERSION_NAME}" +
-                        (if (ui.firmware != null) " · 펌웨어 ${ui.firmware}" else "") +
+                        (if (ui.firmware != null) " · 펌웨어 ${ui.firmware}" else " · 펌웨어 응답 없음") +
+                        (if (ui.lastTx.isNotEmpty()) " · 마지막 명령 ${ui.lastTx}" else "") +
                         (if (ui.updateStatus.isNotEmpty()) "  |  ${ui.updateStatus}" else ""),
                     color = p.grey, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 2
                 )

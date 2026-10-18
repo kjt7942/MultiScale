@@ -45,7 +45,8 @@ data class UiState(
     val updateStatus: String = "",
     val updateReadyTag: String? = null,
     val boxes: Int = 0,
-    val relaunchOk: Boolean = true
+    val relaunchOk: Boolean = true,
+    val lastTx: String = ""
 )
 
 class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.Listener {
@@ -66,6 +67,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
     private var lastLed: List<Int>? = null
     private var lastLedSentMs = 0L
     private var autoInstallTried = false
+    private var verTries = 0
     // 박스 완성 후 새로 채울 저울: 다 찰 때까지 1초마다 다시 요청한다(블루투스 유실 대비).
     private var fillTrays: Set<Int> = emptySet()
     private var fillSentMs = 0L
@@ -112,6 +114,10 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
                 if (connected && !demo && lastDataMs > 0 && now - lastDataMs > 3000 && !staleFed) {
                     staleFed = true
                     process(IntArray(CHANNELS) { -1 })
+                }
+                if (connected && !demo && ui.firmware == null && verTries < 10) {
+                    verTries++
+                    link.send("<VER>\n")
                 }
                 // 내려받은 새 버전은 작업 중(조합 잠금)이 아닐 때 자동으로 설치를 시작한다.
                 if (readyApk != null && !autoInstallTried && !ui.comboLocked && updater.canInstall()) {
@@ -426,6 +432,11 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         }
     }
 
+    private fun sendTx(cmd: String) {
+        ui = ui.copy(lastTx = cmd)
+        link.send(cmd + "\n")
+    }
+
     /** 펌웨어(또는 테스트 모드)에 저울 채우기/비우기를 요청한다. 번호는 0부터. */
     private fun setTrays(fill: Set<Int>, empty: Set<Int>) {
         if (demo) {
@@ -434,8 +445,8 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
             reprocess()
             return
         }
-        if (empty.isNotEmpty()) link.send("<E${empty.sorted().joinToString(",") { "${it + 1}" }}>\n")
-        if (fill.isNotEmpty()) link.send("<F${fill.sorted().joinToString(",") { "${it + 1}" }}>\n")
+        if (empty.isNotEmpty()) sendTx("<E${empty.sorted().joinToString(",") { "${it + 1}" }}>")
+        if (fill.isNotEmpty()) sendTx("<F${fill.sorted().joinToString(",") { "${it + 1}" }}>")
     }
 
     private fun handleRefill() {
