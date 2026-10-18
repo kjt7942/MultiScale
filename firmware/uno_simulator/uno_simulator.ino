@@ -1,4 +1,4 @@
-// MultiScale 테스트용 시뮬레이터 (Arduino Uno + HC-06)  v0.5
+// MultiScale 테스트용 시뮬레이터 (Arduino Uno + HC-06)  펌웨어 v0.5.0
 // 배선: HC-06 TX -> D2, HC-06 RX -> D3(분압 권장), VCC 5V, GND
 // 동작:
 //  - 12개 저울에 500~1000g 랜덤 무게를 채워 0.3초마다 <w1,...,w12> 로 보낸다.
@@ -6,6 +6,8 @@
 //  - 앱이 <F3> 또는 <F1,2,3> 을 보내면 해당 저울에 새 송이(500~1000g 랜덤)를 채운다.
 //  - 스스로 채우거나 비우지 않는다. 언제 채울지는 앱이 정한다.
 #include <SoftwareSerial.h>
+
+#define FW_VERSION "v0.5.0 SIM"   // 앱 버전(MultiScale vX.Y.Z)과는 별개로 이 폴더의 펌웨어만 센다
 
 SoftwareSerial bt(2, 3); // RX, TX
 const uint8_t N = 12;
@@ -29,7 +31,7 @@ void handleLine() {
   if (!e) return;
   *e = 0;
   if (!strcmp(s, "TARE")) { bt.println(F("[SYSTEM] 영점 조절 완료")); return; }
-  if (!strcmp(s, "VER")) { bt.println(F("[VER] SIM-0.5")); return; }
+  if (!strcmp(s, "VER")) { bt.print(F("[VER] ")); bt.println(F(FW_VERSION)); return; }
   if (s[0] == 'E' || s[0] == 'F') {
     bool fill = (s[0] == 'F');
     for (char *tok = strtok(s + 1, ","); tok; tok = strtok(NULL, ",")) {
