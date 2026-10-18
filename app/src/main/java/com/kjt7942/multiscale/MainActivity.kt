@@ -60,7 +60,11 @@ class MainActivity : ComponentActivity() {
         controller.hide(WindowInsetsCompat.Type.systemBars())
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
+        requestedOrientation = orientationFlag(vm.ui.layout.orientation)
         setContent {
+            // 설정에서 가로/세로/자동을 바꾸면 바로 반영한다.
+            val wanted = vm.ui.layout.orientation
+            androidx.compose.runtime.LaunchedEffect(wanted) { requestedOrientation = orientationFlag(wanted) }
             MainScreen(
                 vm = vm,
                 onRequestPermission = { requestBluetoothPermission() },
@@ -80,6 +84,12 @@ class MainActivity : ComponentActivity() {
         if (crashScreen) return
         // 설정 화면에서 권한/페어링을 바꾸고 돌아온 경우
         vm.onPermissionResult()
+    }
+
+    private fun orientationFlag(o: String): Int = when (o) {
+        "portrait" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        "auto" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
 
     private fun requestBluetoothPermission() {

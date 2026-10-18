@@ -67,4 +67,22 @@ class SorterEngineTest {
         assertTrue(e.feed(900, filled).leds.isEmpty())       // 아직 안정 전
         assertEquals(listOf(9, 10), e.feed(1300, filled).leds) // 목표 2050-1200=850
     }
+
+    @Test fun customChannelCountAndTopupTrays() {
+        val e = SorterEngine(6) { now }.also {
+            it.target = 1500; it.minComb = 2; it.maxComb = 3; it.tolerance = 50
+            it.topupTrays = setOf(0)
+        }
+        val arr = intArrayOf(400, 500, 500, 500, 450, 700)
+        e.feed(0, arr)
+        val s = e.feed(600, arr)
+        assertEquals(6, s.weights.size)
+        assertEquals(6, s.roles.size)
+        assertTrue(s.leds.all { it in 1..6 })
+        e.toggleTopup()
+        e.feed(700, arr)
+        val t = e.feed(1300, arr)
+        assertEquals(Role.TOPUP, t.roles[0])
+        assertTrue(1 !in t.leds)
+    }
 }

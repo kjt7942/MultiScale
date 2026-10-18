@@ -9,7 +9,7 @@ data class Saved(
     val minComb: Int = 3,
     val maxComb: Int = 4,
     val tolerance: Int = 50,
-    val dark: Boolean = true,
+    val layout: LayoutConfig = LayoutConfig(),
     val topup: Boolean = false,
     val lockEnabled: Boolean = true,
     val presetIndex: Int? = null,
@@ -41,10 +41,10 @@ class Prefs(ctx: Context) {
                 }
             }
             val calJson = o.optJSONArray("cal_multipliers")
-            val cal = if (calJson != null && calJson.length() == CHANNELS) {
-                List(CHANNELS) { calJson.optDouble(it, 1.0) }
-            } else {
-                List(CHANNELS) { 1.0 }
+            var layout = LayoutConfig.fromJson(o.optJSONObject("layout"))
+            if (!o.has("layout") && o.optBoolean("is_dark_mode", true)) layout = layout.copy(theme = "night")
+            val cal = List(layout.channels) { i ->
+                if (calJson != null && i < calJson.length()) calJson.optDouble(i, 1.0) else 1.0
             }
             val pi = o.optInt("current_preset_index", -1)
             Saved(
@@ -52,7 +52,7 @@ class Prefs(ctx: Context) {
                 minComb = o.optInt("min_comb", 3),
                 maxComb = o.optInt("max_comb", 4),
                 tolerance = o.optInt("tolerance", 50),
-                dark = o.optBoolean("is_dark_mode", true),
+                layout = layout,
                 topup = o.optBoolean("is_topup_mode", false),
                 lockEnabled = o.optBoolean("combo_lock_enabled", true),
                 presetIndex = if (pi in 0..7) pi else null,
@@ -71,7 +71,7 @@ class Prefs(ctx: Context) {
         o.put("min_comb", v.minComb)
         o.put("max_comb", v.maxComb)
         o.put("tolerance", v.tolerance)
-        o.put("is_dark_mode", v.dark)
+        o.put("layout", v.layout.toJson())
         o.put("is_topup_mode", v.topup)
         o.put("combo_lock_enabled", v.lockEnabled)
         o.put("current_preset_index", v.presetIndex ?: -1)

@@ -26,7 +26,9 @@ class Snapshot(
  * 기존 main.py 의 조합/잠금 로직을 화면과 분리해 옮긴 것.
  * 시간은 clock() 으로만 읽어서 테스트에서 제어할 수 있다.
  */
-class SorterEngine(private val clock: () -> Long) {
+class SorterEngine(val channels: Int = CHANNELS, private val clock: () -> Long) {
+    /** 보태기 모드에서 박스를 올리는 저울(0부터). 배열 설정에서 바꿀 수 있다. */
+    var topupTrays: Set<Int> = TOPUP_TRAYS.filter { it < channels }.toSet().ifEmpty { setOf(0) }
     var target = 2050
     var minComb = 3
     var maxComb = 4
@@ -34,12 +36,12 @@ class SorterEngine(private val clock: () -> Long) {
     var topupMode = false
     var lockEnabled = true
     var presetIndex: Int? = null
-    var calMultipliers = DoubleArray(CHANNELS) { 1.0 }
+    var calMultipliers = DoubleArray(channels) { 1.0 }
     var boxesDone = 0
         private set
 
     private var memoMinComb = 3
-    private var weights = IntArray(CHANNELS)
+    private var weights = IntArray(channels)
 
     private var lockedCombo: List<Item>? = null
     private var lockedSum = 0
@@ -47,8 +49,8 @@ class SorterEngine(private val clock: () -> Long) {
     private val emptiedLocked = HashSet<Int>()
     private var boxRecorded = false
     private var settleCandidate: Pair<Int, Long>? = null
-    private val stableRef = arrayOfNulls<Int>(CHANNELS)
-    private val stableSince = LongArray(CHANNELS)
+    private val stableRef = arrayOfNulls<Int>(channels)
+    private val stableSince = LongArray(channels)
 
     // 박스를 치운 직후: 다시 채워야 할 저울(0부터). 다 채워져 자리 잡을 때까지 새 조합을 미룬다.
     private var holdTrays: Set<Int>? = null
@@ -80,12 +82,12 @@ class SorterEngine(private val clock: () -> Long) {
             "target" -> target = maxOf(100, target + delta)
             "tol" -> tolerance = maxOf(0, minOf(TOLERANCE_MAX, tolerance + delta))
             "min" -> {
-                minComb = maxOf(1, minOf(CHANNELS, minComb + delta))
+                minComb = maxOf(1, minOf(channels, minComb + delta))
                 if (minComb > maxComb) maxComb = minComb
                 if (topupMode) memoMinComb = minComb
             }
             "max" -> {
-                maxComb = maxOf(1, minOf(CHANNELS, maxComb + delta))
+                maxComb = maxOf(1, minOf(channels, maxComb + delta))
                 if (maxComb < minComb) minComb = maxComb
                 if (topupMode) memoMinComb = minComb
             }
@@ -130,8 +132,8 @@ class SorterEngine(private val clock: () -> Long) {
     // ---- 무게 입력 ---------------------------------------------------------
     /** 원시 무게(g, 오류는 -1)를 받아 화면에 보일 결과를 계산한다. */
     fun onWeights(raw: IntArray): Snapshot {
-        val calibrated = IntArray(CHANNELS)
-        for (i in 0 until CHANNELS) {
+        val calibrated = IntArray(channels)
+        for (i in 0 until channels) {
             val w = if (i < raw.size) raw[i] else -1
             calibrated[i] = if (w > 0) {
                 // 파이썬 round() 와 같은 짝수 반올림
@@ -147,7 +149,7 @@ class SorterEngine(private val clock: () -> Long) {
 
     private fun trackStability() {
         val now = clock()
-        for (i in 0 until CHANNELS) {
+        for (i in 0 until channels) {
             val ref = stableRef[i]
             if (ref == null || Math.abs(weights[i] - ref) > WEIGHT_STEP) {
                 stableRef[i] = weights[i]
@@ -161,11 +163,11 @@ class SorterEngine(private val clock: () -> Long) {
     private fun evaluate(): Snapshot {
         var total = 0
         var topupSum = 0
-        for (i in 0 until CHANNELS) {
+        for (i in 0 until channels) {
             val w = weights[i]
             if (w > 0) {
                 total += w
-                if (topupMode && i in TOPUP_TRAYS) topupSum += w
+                if (topupMode && i in topupTrays) topupSum += w
             }
         }
         val sum = if (topupMode) topupSum else total
@@ -173,9 +175,9 @@ class SorterEngine(private val clock: () -> Long) {
         if (!lockEnabled) {
             // 잠금 기능이 꺼진 상태: 매번 새로 계산해서 보여주기만 한다(설치/테스트용).
             val items = ArrayList<Item>()
-            for (i in 0 until CHANNELS) {
+            for (i in 0 until channels) {
                 val w = weights[i]
-                if (w > 0 && !(topupMode && i in TOPUP_TRAYS)) items.add(Item(i + 1, w))
+                if (w > 0 && !(topupMode && i in topupTrays)) items.add(Item(i + 1, w))
             }
             val currentTarget = if (topupMode) target - topupSum else target
             val r = Combination.best(items, currentTarget, minComb, maxComb, tolerance)
@@ -230,9 +232,9 @@ class SorterEngine(private val clock: () -> Long) {
                 if (finishedTrays != null) {
                     // 조합 저울 전부와, 보태기 모드면 비어 있는 보태기 저울도 새로 채운다.
                     val fill = HashSet<Int>(finishedTrays)
-                    if (topupMode) for (t in TOPUP_TRAYS) if (weights[t] <= 0) fill.add(t)
+                    if (topupMode) for (t in topupTrays) if (weights[t] <= 0) fill.add(t)
                     refillRequest = fill
-                    holdTrays = if (topupMode) fill + TOPUP_TRAYS else fill
+                    holdTrays = if (topupMode) fill + topupTrays else fill
                     holdUntil = clock() + REFILL_HOLD_MS
                 }
             } else {
@@ -244,15 +246,15 @@ class SorterEngine(private val clock: () -> Long) {
         // 새 조합 전에: 방금 치운 저울들이 다시 채워져 자리 잡을 때까지 기다린다(시간 제한 있음).
         if (holdActive()) return render(null, 0, topupSum, sum, null, null, false)
         // 보태기 모드: 박스 저울(1,2,7,8번)이 모두 올라와 자리 잡기 전에는 조합하지 않는다.
-        if (topupMode && TOPUP_TRAYS.any { !(weights[it] > 0 && isStable(it)) }) {
+        if (topupMode && topupTrays.any { !(weights[it] > 0 && isStable(it)) }) {
             return render(null, 0, topupSum, sum, null, null, false)
         }
 
         // 새 조합은 무게가 자리 잡은 저울로만 만든다.
         val items = ArrayList<Item>()
-        for (i in 0 until CHANNELS) {
+        for (i in 0 until channels) {
             val w = weights[i]
-            if (w > 0 && isStable(i) && !(topupMode && i in TOPUP_TRAYS)) items.add(Item(i + 1, w))
+            if (w > 0 && isStable(i) && !(topupMode && i in topupTrays)) items.add(Item(i + 1, w))
         }
         val currentTarget = if (topupMode) target - topupSum else target
         val r = Combination.best(items, currentTarget, minComb, maxComb, tolerance)
@@ -275,7 +277,7 @@ class SorterEngine(private val clock: () -> Long) {
             return false
         }
         val refilled = hold.all { i ->
-            val min = if (topupMode && i in TOPUP_TRAYS) 1 else REFILL_WEIGHT_THRESHOLD
+            val min = if (topupMode && i in topupTrays) 1 else REFILL_WEIGHT_THRESHOLD
             weights[i] >= min && isStable(i)
         }
         if (refilled) holdTrays = null
@@ -286,8 +288,8 @@ class SorterEngine(private val clock: () -> Long) {
         combo: List<Item>?, bestSum: Int, topupSum: Int, sum: Int,
         near: Int?, currentTarget: Int?, locked: Boolean
     ): Snapshot {
-        val roles = List(CHANNELS) { i ->
-            val isTopup = topupMode && i in TOPUP_TRAYS
+        val roles = List(channels) { i ->
+            val isTopup = topupMode && i in topupTrays
             val isCombo = combo != null && combo.any { it.index == i + 1 }
             when {
                 isTopup -> Role.TOPUP

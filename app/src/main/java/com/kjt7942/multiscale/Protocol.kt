@@ -9,6 +9,7 @@ sealed class Event {
     class Weights(val values: IntArray) : Event()
     class TareOffsets(val values: IntArray) : Event()
     class Version(val text: String) : Event()
+    class ChannelCount(val count: Int) : Event()   // 펌웨어가 보낸 저울 수가 설정과 다름
     object TareDone : Event()
 }
 
@@ -74,7 +75,16 @@ class PacketParser(private val channels: Int = CHANNELS) {
             val e = line.indexOf('>', s)
             if (e > s) {
                 val w = parseWeights(line.substring(s + 1, e))
-                if (w != null) out.add(Event.Weights(w))
+                if (w != null) {
+                    out.add(Event.Weights(w))
+                } else {
+                    val parts = line.substring(s + 1, e).split(",")
+                    val looksLikeWeights = parts.size in 1..64 && parts.all {
+                        val t = it.trim()
+                        t == "ERR" || t.toDoubleOrNull() != null
+                    }
+                    if (looksLikeWeights && parts.size != channels && parts.size > 2) out.add(Event.ChannelCount(parts.size))
+                }
             }
         }
         return out

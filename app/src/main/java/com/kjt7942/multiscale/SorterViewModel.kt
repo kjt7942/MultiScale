@@ -34,7 +34,8 @@ data class UiState(
     val presetIndex: Int? = null,
     val topup: Boolean = false,
     val lockEnabled: Boolean = true,
-    val dark: Boolean = true,
+    val layout: LayoutConfig = LayoutConfig(),
+    val detectedChannels: Int? = null,
     val presets: List<Preset?> = List(8) { null },
     val link: LinkState = LinkState.DISCONNECTED,
     val linkName: String = "",
@@ -52,8 +53,10 @@ data class UiState(
 class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.Listener {
 
     private val prefs = Prefs(app)
-    private val engine = SorterEngine { System.currentTimeMillis() }
-    private val parser = PacketParser()
+    private var layout = LayoutConfig()
+    private val channels: Int get() = layout.channels
+    private var engine = SorterEngine(CHANNELS) { System.currentTimeMillis() }
+    private var parser = PacketParser(CHANNELS)
     private val link = BluetoothLink(this)
     private val updater = Updater(app)
 
@@ -62,7 +65,6 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
 
     private var presets: List<Preset?> = List(8) { null }
     private var lastDevice: String? = null
-    private var dark = true
 
     private var lastLed: List<Int>? = null
     private var lastLedSentMs = 0L
@@ -84,6 +86,12 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
 
     init {
         val s = prefs.read()
+        layout = s.layout
+        engine = SorterEngine(layout.channels) { System.currentTimeMillis() }
+        parser = PacketParser(layout.channels)
+        engine.topupTrays = layout.topup.toSet().ifEmpty { setOf(0) }
+        demoWeights = IntArray(layout.channels)
+        lastRawWeights = IntArray(layout.channels) { -1 }
         engine.target = s.target
         engine.minComb = s.minComb
         engine.maxComb = s.maxComb
@@ -95,8 +103,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         engine.topupMode = s.topup
         presets = s.presets
         lastDevice = s.lastDevice
-        dark = s.dark
-        process(IntArray(CHANNELS) { -1 }) // 연결 전에는 에러 표시
+        process(IntArray(channels) { -1 }) // 연결 전에는 에러 표시
         syncSettings()
         ui = ui.copy(btPermission = hasBtPermission(), relaunchOk = canRelaunch())
         if (!canRelaunch()) {
@@ -113,7 +120,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
                 val now = System.currentTimeMillis()
                 if (connected && !demo && lastDataMs > 0 && now - lastDataMs > 3000 && !staleFed) {
                     staleFed = true
-                    process(IntArray(CHANNELS) { -1 })
+                    process(IntArray(channels) { -1 })
                 }
                 if (connected && !demo && ui.firmware == null && verTries < 10) {
                     verTries++
@@ -226,7 +233,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
                 parser.resetErrHold()
                 link.send("<VER>\n")
             } else if (!demo) {
-                process(IntArray(CHANNELS) { -1 })
+                process(IntArray(channels) { -1 })
             }
         }
     }
@@ -236,6 +243,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
             for (e in parser.parseLine(line)) {
                 when (e) {
                     is Event.Weights -> {
+                        if (ui.detectedChannels != null) ui = ui.copy(detectedChannels = null)
                         if (!demo) {
                             lastDataMs = System.currentTimeMillis()
                             staleFed = false
@@ -245,6 +253,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
                     is Event.Version -> ui = ui.copy(firmware = e.text)
                     is Event.TareDone -> showMessage("영점 조정이 완료되었습니다.", 2000)
                     is Event.TareOffsets -> {}
+                    is Event.ChannelCount -> if (ui.detectedChannels != e.count) ui = ui.copy(detectedChannels = e.count)
                 }
             }
         }
@@ -287,7 +296,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
             topup = engine.topupMode,
             lockEnabled = engine.lockEnabled,
             presets = presets,
-            dark = dark
+            layout = layout
         )
     }
 
@@ -295,7 +304,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         prefs.write(
             Saved(
                 target = engine.target, minComb = engine.minComb, maxComb = engine.maxComb,
-                tolerance = engine.tolerance, dark = dark, topup = engine.topupMode,
+                tolerance = engine.tolerance, layout = layout, topup = engine.topupMode,
                 lockEnabled = engine.lockEnabled, presetIndex = engine.presetIndex,
                 presets = presets, cal = engine.calMultipliers.toList(), lastDevice = lastDevice
             )
@@ -384,10 +393,52 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         reprocess()
     }
 
-    fun toggleTheme() {
-        dark = !dark
+    // ---- 화면 배열/테마 설정 ---------------------------------------------------
+    private fun applyLayout(n: LayoutConfig) {
+        val next = n.normalized()
+        val old = layout
+        layout = next
+        if (next.channels != old.channels) {
+            // 저울 수가 바뀌면 계산기를 새로 만든다(설정값은 그대로 옮긴다).
+            val e = SorterEngine(next.channels) { System.currentTimeMillis() }
+            e.target = engine.target
+            e.minComb = minOf(engine.minComb, next.channels)
+            e.maxComb = minOf(engine.maxComb, next.channels).coerceAtLeast(e.minComb)
+            e.tolerance = engine.tolerance
+            e.lockEnabled = engine.lockEnabled
+            e.presetIndex = engine.presetIndex
+            e.calMultipliers = DoubleArray(next.channels) { engine.calMultipliers.getOrElse(it) { 1.0 } }
+            e.restore(engine.topupMode, minOf(engine.rememberedMinComb, next.channels))
+            e.topupMode = engine.topupMode
+            engine = e
+            parser = PacketParser(next.channels)
+            lastLed = null
+            fillTrays = emptySet()
+            demoWeights = IntArray(next.channels) { if (Random.nextInt(10) > 0) Random.nextInt(500, 1001) else 0 }
+            lastRawWeights = IntArray(next.channels) { -1 }
+            ui = ui.copy(detectedChannels = null)
+            engine.topupTrays = next.topup.toSet().ifEmpty { setOf(0) }
+            if (demo) reprocess() else process(IntArray(next.channels) { -1 })
+        } else if (next.topup != old.topup) {
+            engine.topupTrays = next.topup.toSet().ifEmpty { setOf(0) }
+            engine.forceUnlock()
+            reprocess()
+        }
         syncSettings()
         persist()
+    }
+
+    fun setChannels(n: Int) = applyLayout(layout.withChannels(n))
+    fun setCols(c: Int) = applyLayout(layout.withCols(c))
+    fun setBottomFirst(b: Boolean) = applyLayout(layout.withBottomFirst(b))
+    fun resetCells() = applyLayout(layout.resetCells())
+    fun swapCells(a: Int, b: Int) = applyLayout(layout.swap(a, b))
+    fun toggleTopupTray(tray: Int) = applyLayout(layout.toggleTopup(tray))
+    fun setTheme(id: String) = applyLayout(layout.copy(theme = id))
+    fun setOrientation(o: String) = applyLayout(layout.copy(orientation = o))
+    fun applyDetectedChannels() {
+        val n = ui.detectedChannels ?: return
+        if (n in MIN_TRAYS..MAX_TRAYS) applyLayout(layout.withChannels(n))
     }
 
     fun tare() {
@@ -408,7 +459,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
     fun forceUnlock() {
         engine.forceUnlock()
         if (demo) {
-            demoWeights = IntArray(CHANNELS) { Random.nextInt(500, 1001) }
+            demoWeights = IntArray(channels) { Random.nextInt(500, 1001) }
             showMessage("모든 저울의 무게가 무작위로 변경되었습니다.", 1000)
         } else {
             showMessage("조합을 다시 찾습니다.", 900)
@@ -472,7 +523,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         demoJob?.cancel()
         if (demo) {
             link.disconnect()
-            demoWeights = IntArray(CHANNELS) { if (Random.nextInt(10) > 0) Random.nextInt(500, 1001) else 0 }
+            demoWeights = IntArray(channels) { if (Random.nextInt(10) > 0) Random.nextInt(500, 1001) else 0 }
             lastLed = null
             ui = ui.copy(demo = true)
             reprocess()
@@ -485,7 +536,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
             }
         } else {
             ui = ui.copy(demo = false)
-            process(IntArray(CHANNELS) { -1 })
+            process(IntArray(channels) { -1 })
             autoConnect()
         }
     }

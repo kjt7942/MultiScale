@@ -14,7 +14,17 @@ class ProtocolTest {
     }
 
     @Test fun wrongChannelCountIgnored() {
-        assertTrue(PacketParser().parseLine("<1,2,3>").isEmpty())
+        assertTrue(PacketParser().parseLine("<1,2,3>").none { it is Event.Weights })
+    }
+
+    @Test fun customChannelCountParses() {
+        val e = PacketParser(8).parseLine("<1,2,3,4,5,6,7,8>")
+        assertEquals(8, (e[0] as Event.Weights).values.size)
+    }
+
+    @Test fun mismatchedCountIsReported() {
+        val e = PacketParser(12).parseLine("<1,2,3,4,5,6>")
+        assertEquals(6, (e.single() as Event.ChannelCount).count)
     }
 
     @Test fun shortErrIsHeldThenBecomesMinusOne() {
