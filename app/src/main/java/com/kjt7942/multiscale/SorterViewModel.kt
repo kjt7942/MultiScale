@@ -435,6 +435,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
     fun swapCells(a: Int, b: Int) = applyLayout(layout.swap(a, b))
     fun toggleTopupTray(tray: Int) = applyLayout(layout.toggleTopup(tray))
     fun setTheme(id: String) = applyLayout(layout.copy(theme = id))
+    fun setShowBars(b: Boolean) = applyLayout(layout.copy(showBars = b))
     fun setOrientation(o: String) = applyLayout(layout.copy(orientation = o))
     fun applyDetectedChannels() {
         val n = ui.detectedChannels ?: return

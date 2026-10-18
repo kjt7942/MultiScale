@@ -18,7 +18,8 @@ data class LayoutConfig(
     val cells: List<Int> = defaultCells(CHANNELS, 6, true),
     val topup: List<Int> = listOf(0, 1, 6, 7),
     val theme: String = "grape",
-    val orientation: String = "landscape"   // auto | landscape | portrait
+    val orientation: String = "landscape",   // auto | landscape | portrait
+    val showBars: Boolean = false
 ) {
     val rows: Int get() = if (cols <= 0) 1 else (cells.size + cols - 1) / cols
 
@@ -78,6 +79,7 @@ data class LayoutConfig(
         put("topup", JSONArray(topup))
         put("theme", theme)
         put("orientation", orientation)
+        put("show_bars", showBars)
     }
 
     companion object {
@@ -108,7 +110,8 @@ data class LayoutConfig(
                     cells = if (ca == null) emptyList() else List(ca.length()) { ca.optInt(it, -1) },
                     topup = if (ta == null) listOf(0, 1, 6, 7) else List(ta.length()) { ta.optInt(it) },
                     theme = o.optString("theme", "grape"),
-                    orientation = o.optString("orientation", "landscape")
+                    orientation = o.optString("orientation", "landscape"),
+                    showBars = o.optBoolean("show_bars", false)
                 ).normalized()
             } catch (e: Exception) {
                 LayoutConfig()

@@ -61,13 +61,13 @@ private class Dim(val compact: Boolean) {
     val pad: Dp = if (compact) 8.dp else 16.dp
     val gap: Dp = if (compact) 6.dp else 12.dp
     val radius: Dp = if (compact) 14.dp else 22.dp
-    val heroValue = if (compact) 30.sp else 52.sp
-    val kpiValue = if (compact) 20.sp else 36.sp
+    val heroValue = if (compact) 46.sp else 80.sp
+    val kpiValue = if (compact) 28.sp else 52.sp
     val kpiLabel = if (compact) 11.sp else 13.sp
     val title = if (compact) 17.sp else 22.sp
     val stepValue = if (compact) 18.sp else 26.sp
     val bottomH: Dp = if (compact) 52.dp else 80.dp
-    val kpiH: Dp = if (compact) 64.dp else 112.dp
+    val kpiH: Dp = if (compact) 74.dp else 132.dp
 }
 
 @Composable
@@ -258,12 +258,14 @@ private fun HeroCard(ui: UiState, p: Palette, d: Dim, modifier: Modifier, onClic
             )
             val nums = ui.roles.withIndex().filter { it.value == Role.COMBO }.map { it.index + 1 }
             if (nums.isNotEmpty()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(if (d.compact) 4.dp else 8.dp)) {
                     for (n in nums.take(7)) {
-                        Text("${n}번", color = p.heroText, fontSize = if (d.compact) 11.sp else 13.sp, fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(p.heroSub.copy(alpha = 0.25f)).padding(horizontal = 7.dp, vertical = 2.dp))
+                        Text("$n", color = p.onAccent, fontSize = if (d.compact) 20.sp else 34.sp, fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.clip(RoundedCornerShape(if (d.compact) 8.dp else 12.dp)).background(p.accent)
+                                .widthIn(min = if (d.compact) 28.dp else 48.dp).padding(horizontal = 6.dp, vertical = if (d.compact) 1.dp else 3.dp))
                     }
-                    if (nums.size > 7) Text("+${nums.size - 7}", color = p.heroSub, fontSize = 12.sp)
+                    if (nums.size > 7) Text("+${nums.size - 7}", color = p.heroSub, fontSize = 14.sp)
                 }
             }
         }
@@ -278,7 +280,7 @@ private fun KpiCard(label: String, value: String, unit: String, p: Palette, d: D
         verticalArrangement = Arrangement.Center
     ) {
         Text(label, color = p.sub, fontSize = d.kpiLabel, maxLines = 1)
-        Row(verticalAlignment = Alignment.Bottom) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.End) {
             Text(value, color = p.text, fontSize = d.kpiValue, fontWeight = FontWeight.Bold, maxLines = 1)
             if (unit.isNotEmpty()) Text(" $unit", color = p.sub, fontSize = d.kpiLabel, modifier = Modifier.padding(bottom = 4.dp), maxLines = 1)
         }
@@ -303,7 +305,7 @@ private fun TrayGrid(
                     val cellMod = Modifier.weight(1f).fillMaxHeight()
                     if (tray in ui.weights.indices) {
                         TrayTile(
-                            tray, ui.weights[tray], ui.roles[tray], p, d, selected = edit && picked == cell, edit = edit,
+                            tray, ui.weights[tray], ui.roles[tray], p, d, selected = edit && picked == cell, edit = edit, showBars = ui.layout.showBars,
                             modifier = cellMod
                         ) { if (edit) onPick(cell) else vm.onTrayClick(tray) }
                     } else if (edit) {
@@ -324,7 +326,7 @@ private fun TrayGrid(
 
 @Composable
 private fun TrayTile(
-    tray: Int, weight: Int, role: Role, p: Palette, d: Dim, selected: Boolean, edit: Boolean,
+    tray: Int, weight: Int, role: Role, p: Palette, d: Dim, selected: Boolean, edit: Boolean, showBars: Boolean,
     modifier: Modifier, onClick: () -> Unit
 ) {
     val bg = when (role) {
@@ -351,14 +353,18 @@ private fun TrayTile(
     BoxWithConstraints(
         modifier.clip(shape).background(bg).border(if (selected) 3.dp else 1.dp, borderColor, shape).clickable { onClick() }
     ) {
-        val big = minOf(maxWidth.value * 0.27f, maxHeight.value * 0.36f).coerceIn(13f, 46f)
+        val big = minOf(maxWidth.value * 0.3f, maxHeight.value * (if (showBars) 0.38f else 0.5f)).coerceIn(14f, 64f)
         val small = (maxWidth.value * 0.12f).coerceIn(10f, 14f)
         val inner = if (d.compact) 8.dp else 14.dp
         val showTag = maxWidth > 70.dp
         val showUnit = maxWidth > 95.dp
         Column(Modifier.fillMaxSize().padding(inner), verticalArrangement = Arrangement.SpaceBetween) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("${tray + 1}번", color = subFg, fontSize = small.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(
+                    "${tray + 1}번", color = if (role == Role.COMBO) fg else subFg,
+                    fontSize = (if (role == Role.COMBO) small * 1.6f else small).sp,
+                    fontWeight = if (role == Role.COMBO) FontWeight.ExtraBold else FontWeight.Bold, maxLines = 1
+                )
                 val tag = when (role) {
                     Role.COMBO -> "조합"
                     Role.TOPUP -> "보태기"
@@ -366,7 +372,7 @@ private fun TrayTile(
                 }
                 if (tag.isNotEmpty() && showTag) Text(tag, color = subFg, fontSize = small.sp, maxLines = 1)
             }
-            Row(verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.End) {
                 val text = if (weight > 0) fmt(weight) else if (weight == -1) "ERR" else "0"
                 val color = when {
                     weight == -1 -> if (role == Role.NONE) p.err else fg
@@ -377,7 +383,7 @@ private fun TrayTile(
                 if (weight >= 0 && showUnit) Text(" g", color = subFg, fontSize = small.sp, modifier = Modifier.padding(bottom = 3.dp))
             }
             val frac = if (weight > 0) (weight / 1000f).coerceIn(0f, 1f) else 0f
-            Box(
+            if (showBars) Box(
                 Modifier.fillMaxWidth().height(if (d.compact) 4.dp else 7.dp).clip(RoundedCornerShape(99.dp))
                     .background(if (role == Role.COMBO) Color.White.copy(alpha = 0.3f) else p.track)
             ) {
@@ -593,6 +599,13 @@ private fun LayoutTab(vm: SorterViewModel, ui: UiState, p: Palette, onEditCells:
                         Text(t.label, color = t.text, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
+            }
+        }
+        Section("저울 표시", p) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("무게 막대(바)", color = p.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Choice("끔", !lay.showBars, p) { vm.setShowBars(false) }
+                Choice("켬", lay.showBars, p) { vm.setShowBars(true) }
             }
         }
         Section("저울 배열 (DIY: 저울을 늘리거나 줄이면 여기서 맞추세요)", p) {
