@@ -44,7 +44,8 @@ data class UiState(
     val firmware: String? = null,
     val updateStatus: String = "",
     val updateReadyTag: String? = null,
-    val boxes: Int = 0
+    val boxes: Int = 0,
+    val relaunchOk: Boolean = true
 )
 
 class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.Listener {
@@ -92,7 +93,13 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         dark = s.dark
         process(IntArray(CHANNELS) { -1 }) // 연결 전에는 에러 표시
         syncSettings()
-        ui = ui.copy(btPermission = hasBtPermission())
+        ui = ui.copy(btPermission = hasBtPermission(), relaunchOk = canRelaunch())
+        if (!canRelaunch()) {
+            viewModelScope.launch {
+                delay(3000)
+                showMessage("업데이트 후 자동 실행하려면\n[관리]에서 '자동 재실행'을 허용하세요.", 5000)
+            }
+        }
 
         viewModelScope.launch {
             // 데이터가 끊긴 채 화면이 마지막 값에 머무르지 않게 감시한다.
@@ -145,8 +152,19 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    fun canRelaunch(): Boolean = android.provider.Settings.canDrawOverlays(getApplication())
+
+    /** 업데이트 후 앱이 스스로 다시 실행되려면 '다른 앱 위에 표시' 허용이 필요하다. */
+    fun openOverlaySettings() {
+        val i = android.content.Intent(
+            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            android.net.Uri.parse("package:${getApplication<Application>().packageName}")
+        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        getApplication<Application>().startActivity(i)
+    }
+
     fun onPermissionResult() {
-        ui = ui.copy(btPermission = hasBtPermission())
+        ui = ui.copy(btPermission = hasBtPermission(), relaunchOk = canRelaunch())
         if (hasBtPermission()) autoConnect()
     }
 

@@ -380,6 +380,10 @@ fun ManageDialog(vm: SorterViewModel, ui: UiState, p: Palette, onClose: () -> Un
                 if (ui.updateReadyTag != null) {
                     SmallButton("지금 업데이트", p, Blue, Color.White) { vm.installUpdate() }
                 }
+                SmallButton(
+                    if (ui.relaunchOk) "자동 재실행:켜짐" else "자동 재실행:허용하기", p,
+                    if (ui.relaunchOk) p.btnBg else Blue, if (ui.relaunchOk) p.btnText else Color.White
+                ) { if (!ui.relaunchOk) vm.openOverlaySettings() }
                 SmallButton("업데이트 확인", p, p.btnBg, p.btnText) { vm.checkUpdate(manual = true) }
                 SmallButton("닫기", p, Color(0xFF6B7280), Color.White, onClose)
             }
