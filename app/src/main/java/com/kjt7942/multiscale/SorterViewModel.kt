@@ -232,6 +232,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
             shortage = s.shortage,
             boxes = engine.boxesDone
         )
+        handleRefill()
         emitLed(s.leds)
     }
 
@@ -384,15 +385,53 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         reprocess()
     }
 
-    /** 저울을 누르면 현재 값과 상관없이 새 송이(500~1000g 랜덤)로 바뀐다. */
+    /**
+     * 저울 누르기(시뮬레이션용).
+     *  - 조합이 잠긴 상태: 값이 있는 조합/보태기 저울은 0 으로 비운다. 조합 저울이 전부 0 이 되면
+     *    process() 가 비워진 저울을 한꺼번에 새 값으로 채우고, 다 채워진 뒤에 새 조합을 찾는다.
+     *  - 조합이 없는 상태: 0 이면 랜덤값으로 채우고, 값이 있으면 0 으로 비운다.
+     */
     fun onTrayClick(i: Int) {
-        if (!demo) {
-            // 실제 연결 상태(시뮬레이터 펌웨어 전용 명령): 값이 0이든 있든 새 송이로 채운다. <F번호>, 번호는 1부터
-            if (connected) link.send("<F${i + 1}>\n")
+        if (!demo && !connected) return
+        val w = ui.weights[i]
+        if (ui.comboLocked) {
+            if (w > 0 && ui.roles[i] != Role.NONE) setTrays(emptySet(), setOf(i))
+        } else {
+            if (w == 0) setTrays(setOf(i), emptySet()) else if (w > 0) setTrays(emptySet(), setOf(i))
+        }
+    }
+
+    /** 펌웨어(또는 테스트 모드)에 저울 채우기/비우기를 요청한다. 번호는 0부터. */
+    private fun setTrays(fill: Set<Int>, empty: Set<Int>) {
+        if (demo) {
+            for (i in fill) demoWeights[i] = Random.nextInt(500, 1001)
+            for (i in empty) demoWeights[i] = 0
+            reprocess()
             return
         }
-        demoWeights[i] = Random.nextInt(500, 1001)
-        reprocess()
+        if (empty.isNotEmpty()) link.send("<E${empty.sorted().joinToString(",") { "${it + 1}" }}>\n")
+        if (fill.isNotEmpty()) link.send("<F${fill.sorted().joinToString(",") { "${it + 1}" }}>\n")
+    }
+
+    // 박스 완성 후 새로 채울 저울: 다 찰 때까지 1초마다 다시 요청한다(블루투스 유실 대비).
+    private var fillTrays: Set<Int> = emptySet()
+    private var fillSentMs = 0L
+
+    private fun handleRefill() {
+        engine.takeRefill()?.let {
+            fillTrays = it
+            fillSentMs = System.currentTimeMillis()
+            setTrays(it, emptySet())
+            return
+        }
+        if (fillTrays.isEmpty()) return
+        val left = fillTrays.filter { ui.weights[it] <= 0 }.toSet()
+        fillTrays = left
+        val now = System.currentTimeMillis()
+        if (left.isNotEmpty() && now - fillSentMs > 1000) {
+            fillSentMs = now
+            setTrays(left, emptySet())
+        }
     }
 
     // ---- 테스트 모드(장치 없이 화면 확인) ---------------------------------------

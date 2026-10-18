@@ -4,6 +4,7 @@ const val WEIGHT_STEP = 5                   // 5g 단위로 반올림해 표시/
 const val REFILL_WEIGHT_THRESHOLD = 300     // 잠금 중 비워진 저울에 이 이상 다시 찍히면 새 송이로 본다
 const val SETTLE_STABLE_MS = 500L           // 조합무게 반영 전 같은 값이 유지돼야 하는 시간
 const val LOCK_STABLE_MS = 500L             // 새 조합을 잠글 때 저울 무게가 안정돼야 하는 시간
+const val REFILL_HOLD_MS = 4000L            // 박스를 치운 뒤 비워진 저울이 다시 찰 때까지 새 조합을 미루는 최대 시간
 const val TOLERANCE_MAX = 500
 val TOPUP_TRAYS = setOf(0, 1, 6, 7)         // 보태기 모드에서 박스를 올리는 저울(0부터)
 
@@ -49,6 +50,14 @@ class SorterEngine(private val clock: () -> Long) {
     private val stableRef = arrayOfNulls<Int>(CHANNELS)
     private val stableSince = LongArray(CHANNELS)
 
+    // 박스를 치운 직후: 다시 채워야 할 저울(0부터). 다 채워져 자리 잡을 때까지 새 조합을 미룬다.
+    private var holdTrays: Set<Int>? = null
+    private var holdUntil = 0L
+    private var refillRequest: Set<Int>? = null
+
+    /** 방금 박스가 완성돼 새로 채워야 하는 저울(0부터)이 있으면 한 번만 돌려준다. */
+    fun takeRefill(): Set<Int>? = refillRequest.also { refillRequest = null }
+
     // ---- 설정 조작 ---------------------------------------------------------
     private fun resetLock() {
         lockedCombo = null
@@ -57,6 +66,8 @@ class SorterEngine(private val clock: () -> Long) {
         emptiedLocked.clear()
         boxRecorded = false
         settleCandidate = null
+        holdTrays = null
+        refillRequest = null
     }
 
     fun forceUnlock() = resetLock()
@@ -171,6 +182,7 @@ class SorterEngine(private val clock: () -> Long) {
             return render(r.combo, r.total, topupSum, sum, r.nearTotal, currentTarget, false)
         }
 
+        var finishedTrays: Set<Int>? = null
         val locked = lockedCombo
         if (locked != null) {
             val still = ArrayList<Item>()
@@ -209,17 +221,28 @@ class SorterEngine(private val clock: () -> Long) {
                     boxesDone += 1
                     boxRecorded = true
                 }
+                finishedTrays = originalLockedIndices.map { it - 1 }.toSet()
                 still.clear()
             }
 
             if (still.isEmpty()) {
                 resetLock()
+                if (finishedTrays != null) {
+                    // 조합 저울 전부와, 보태기 모드면 비어 있는 보태기 저울도 새로 채운다.
+                    val fill = HashSet<Int>(finishedTrays)
+                    if (topupMode) for (t in TOPUP_TRAYS) if (weights[t] <= 0) fill.add(t)
+                    refillRequest = fill
+                    holdTrays = if (topupMode) fill + TOPUP_TRAYS else fill
+                    holdUntil = clock() + REFILL_HOLD_MS
+                }
             } else {
                 lockedCombo = still
                 return render(still, lockedSum, topupSum, sum, null, null, true)
             }
         }
 
+        // 새 조합 전에: 방금 치운 저울들이 다시 채워져 자리 잡을 때까지 기다린다(시간 제한 있음).
+        if (holdActive()) return render(null, 0, topupSum, sum, null, null, false)
         // 보태기 모드: 박스 저울(1,2,7,8번)이 모두 올라와 자리 잡기 전에는 조합하지 않는다.
         if (topupMode && TOPUP_TRAYS.any { !(weights[it] > 0 && isStable(it)) }) {
             return render(null, 0, topupSum, sum, null, null, false)
@@ -243,6 +266,20 @@ class SorterEngine(private val clock: () -> Long) {
             originalLockedIndices = found.map { it.index }
         }
         return render(found, r.total, topupSum, sum, r.nearTotal, currentTarget, lockedCombo != null)
+    }
+
+    private fun holdActive(): Boolean {
+        val hold = holdTrays ?: return false
+        if (clock() >= holdUntil) {
+            holdTrays = null
+            return false
+        }
+        val refilled = hold.all { i ->
+            val min = if (topupMode && i in TOPUP_TRAYS) 1 else REFILL_WEIGHT_THRESHOLD
+            weights[i] >= min && isStable(i)
+        }
+        if (refilled) holdTrays = null
+        return !refilled
     }
 
     private fun render(

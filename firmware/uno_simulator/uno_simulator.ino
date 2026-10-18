@@ -1,10 +1,10 @@
-// MultiScale 테스트용 시뮬레이터 (Arduino Uno + HC-06)  v0.3
+// MultiScale 테스트용 시뮬레이터 (Arduino Uno + HC-06)  v0.4
 // 배선: HC-06 TX -> D2, HC-06 RX -> D3(분압 권장), VCC 5V, GND
 // 동작:
 //  - 12개 저울에 500~1000g 랜덤 무게를 채워 0.3초마다 <w1,...,w12> 로 보낸다.
-//  - 앱이 <E3> 을 보내면 3번 저울을 0g 으로 비운다.
-//  - 앱이 <F3> 을 보내면 3번 저울에 새 송이(500~1000g 랜덤)를 채운다.
-//  - 자동으로 채우는 동작은 없다. 앱에서 0g 저울을 눌러 채운다.
+//  - 앱이 <E3> 또는 <E1,2,3> 을 보내면 해당 저울을 0g 으로 비운다.
+//  - 앱이 <F3> 또는 <F1,2,3> 을 보내면 해당 저울에 새 송이(500~1000g 랜덤)를 채운다.
+//  - 스스로 채우거나 비우지 않는다. 언제 채울지는 앱이 정한다.
 #include <SoftwareSerial.h>
 
 SoftwareSerial bt(2, 3); // RX, TX
@@ -28,11 +28,14 @@ void handleLine() {
   if (!e) return;
   *e = 0;
   if (!strcmp(s, "TARE")) { bt.println(F("[SYSTEM] 영점 조절 완료")); return; }
-  if (!strcmp(s, "VER")) { bt.println(F("[VER] SIM-0.3")); return; }
+  if (!strcmp(s, "VER")) { bt.println(F("[VER] SIM-0.4")); return; }
   if (s[0] == 'E' || s[0] == 'F') {
-    int n = atoi(s + 1);
-    if (n < 1 || n > N) return;
-    w[n - 1] = (s[0] == 'E') ? 0 : rndWeight();
+    bool fill = (s[0] == 'F');
+    for (char *tok = strtok(s + 1, ","); tok; tok = strtok(NULL, ",")) {
+      int n = atoi(tok);
+      if (n >= 1 && n <= N) w[n - 1] = fill ? rndWeight() : 0;
+    }
+    return;
   }
   // 그 외(LED 번호 목록 등)는 무시
 }
