@@ -4,7 +4,8 @@
 //  - 12개 저울에 500~1000g 랜덤 무게를 채워 0.3초마다 <w1,...,w12> 로 보낸다.
 //  - 앱이 <1,3,5> 로 보내 주는 '조합 저울' 번호를 기억한다.
 //  - 앱이 <E3> 을 보내면 3번 저울을 0g 으로 비운다.
-//  - 조합 저울이 전부 비워지면 0.7초 뒤 비워진 저울에 랜덤 무게를 다시 채운다.
+//  - 조합 저울이 전부 비워지면 0.7초 뒤, 그때까지 비워진 저울(보태기 저울 포함)을 한꺼번에 다시 채운다.
+//  - 조합이 없는 상태에서 비운 저울은 0.7초 뒤 개별로 다시 채운다.
 #include <SoftwareSerial.h>
 
 SoftwareSerial bt(2, 3); // RX, TX
@@ -16,6 +17,7 @@ int w[N];
 uint16_t comboMask = 0, emptiedMask = 0, refillMask = 0;
 bool refillPending = false;
 unsigned long refillAt = 0, lastTx = 0;
+unsigned long idleRefillAt[N]; // 0 이면 예약 없음
 char line[48];
 uint8_t len = 0;
 
@@ -32,11 +34,12 @@ void handleLine() {
   if (!e) return;
   *e = 0;
   if (!strcmp(s, "TARE")) { bt.println(F("[SYSTEM] 영점 조절 완료")); return; }
-  if (!strcmp(s, "VER")) { bt.println(F("[VER] SIM-0.1")); return; }
+  if (!strcmp(s, "VER")) { bt.println(F("[VER] SIM-0.2")); return; }
   if (s[0] == 'E') {
     int n = atoi(s + 1);
     if (n < 1 || n > N) return;
     w[n - 1] = 0;
+    if (comboMask == 0) { idleRefillAt[n - 1] = millis() + 700; return; }
     emptiedMask |= (1u << (n - 1));
     if (comboMask && (comboMask & ~emptiedMask) == 0 && !refillPending) {
       refillPending = true;
@@ -72,6 +75,9 @@ void loop() {
   if (refillPending && now >= refillAt) {
     for (uint8_t i = 0; i < N; i++) if (refillMask & (1u << i)) w[i] = rndWeight();
     emptiedMask = 0; comboMask = 0; refillPending = false;
+  }
+  for (uint8_t i = 0; i < N; i++) {
+    if (idleRefillAt[i] && now >= idleRefillAt[i]) { w[i] = rndWeight(); idleRefillAt[i] = 0; }
   }
   if (now - lastTx >= SEND_MS) {
     lastTx = now;
