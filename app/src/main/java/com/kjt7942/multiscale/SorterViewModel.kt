@@ -63,6 +63,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
     private var dark = true
 
     private var lastLed: List<Int>? = null
+    private var lastLedSentMs = 0L
     private var lastDataMs = 0L
     private var staleFed = false
     private var connected = false
@@ -100,6 +101,12 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
                 if (connected && !demo && lastDataMs > 0 && now - lastDataMs > 3000 && !staleFed) {
                     staleFed = true
                     process(IntArray(CHANNELS) { -1 })
+                }
+                // LED(=조합) 표시는 바뀔 때만 보내므로, 블루투스에서 한 번 유실돼도 복구되게 2초마다 다시 보낸다.
+                val led = lastLed
+                if (connected && !demo && led != null && now - lastLedSentMs > 2000) {
+                    lastLedSentMs = now
+                    link.send("<${led.joinToString(",")}>\n")
                 }
             }
         }
@@ -220,7 +227,10 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         val key = indices.sorted()
         if (key == lastLed) return // 바뀐 게 없으면 보내지 않는다
         lastLed = key
-        if (!demo && connected) link.send("<${indices.joinToString(",")}>\n")
+        if (!demo && connected) {
+            lastLedSentMs = System.currentTimeMillis()
+            link.send("<${indices.joinToString(",")}>\n")
+        }
     }
 
     private fun syncSettings() {
@@ -364,7 +374,12 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
 
     /** 테스트 모드에서만: 저울을 눌러 비우거나(0g) 새 송이를 올린다(500~1000g). */
     fun onTrayClick(i: Int) {
-        if (!demo) return
+        if (!demo) {
+            // 실제 연결 상태: 무게가 있고 조합/보태기에 쓰이는 저울이면 아두이노에 '비우기'를 요청한다.
+            // (시뮬레이터 펌웨어 전용 명령: <E번호>, 번호는 1부터)
+            if (connected && ui.weights[i] > 0 && ui.roles[i] != Role.NONE) link.send("<E${i + 1}>\n")
+            return
+        }
         demoWeights[i] = if (demoWeights[i] > 0) 0 else Random.nextInt(500, 1001)
         reprocess()
     }
