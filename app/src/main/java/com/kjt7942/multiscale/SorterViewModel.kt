@@ -152,7 +152,11 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    fun canRelaunch(): Boolean = android.provider.Settings.canDrawOverlays(getApplication())
+    fun canRelaunch(): Boolean = try {
+        android.provider.Settings.canDrawOverlays(getApplication<Application>())
+    } catch (e: Exception) {
+        false
+    }
 
     /** 업데이트 후 앱이 스스로 다시 실행되려면 '다른 앱 위에 표시' 허용이 필요하다. */
     fun openOverlaySettings() {

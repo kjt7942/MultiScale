@@ -15,6 +15,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : ComponentActivity() {
+    private var crashScreen = false
 
     private val vm: SorterViewModel by viewModels()
 
@@ -25,6 +26,32 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 지난 실행이 비정상 종료였다면 원인을 먼저 보여준다(캡처해서 알려주세요).
+        val crash = CrashLog.take(this)
+        if (crash != null) {
+            crashScreen = true
+            val text = android.widget.TextView(this).apply {
+                this.text = "지난 실행에서 오류가 발생했습니다.\n\n$crash"
+                textSize = 11f
+                setTextIsSelectable(true)
+                setTextColor(android.graphics.Color.WHITE)
+                setPadding(32, 32, 32, 32)
+            }
+            val button = android.widget.Button(this).apply {
+                this.text = "앱 실행"
+                setOnClickListener { crashScreen = false; recreate() }
+            }
+            val box = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setBackgroundColor(android.graphics.Color.BLACK)
+                addView(android.widget.ScrollView(this@MainActivity).apply { addView(text) },
+                    android.widget.LinearLayout.LayoutParams(-1, 0, 1f))
+                addView(button)
+            }
+            setContentView(box)
+            return
+        }
 
         // 저울 옆에 두고 쓰는 화면이라 전체화면 + 화면 켜짐 유지
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -50,6 +77,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (crashScreen) return
         // 설정 화면에서 권한/페어링을 바꾸고 돌아온 경우
         vm.onPermissionResult()
     }
