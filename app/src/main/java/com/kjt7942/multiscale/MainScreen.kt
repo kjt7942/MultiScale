@@ -354,6 +354,8 @@ private fun TrayTile(
         val big = minOf(maxWidth.value * 0.27f, maxHeight.value * 0.36f).coerceIn(13f, 46f)
         val small = (maxWidth.value * 0.12f).coerceIn(10f, 14f)
         val inner = if (d.compact) 8.dp else 14.dp
+        val showTag = maxWidth > 70.dp
+        val showUnit = maxWidth > 95.dp
         Column(Modifier.fillMaxSize().padding(inner), verticalArrangement = Arrangement.SpaceBetween) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("${tray + 1}번", color = subFg, fontSize = small.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -362,7 +364,7 @@ private fun TrayTile(
                     Role.TOPUP -> "보태기"
                     else -> ""
                 }
-                if (tag.isNotEmpty() && maxWidth > 70.dp) Text(tag, color = subFg, fontSize = small.sp, maxLines = 1)
+                if (tag.isNotEmpty() && showTag) Text(tag, color = subFg, fontSize = small.sp, maxLines = 1)
             }
             Row(verticalAlignment = Alignment.Bottom) {
                 val text = if (weight > 0) fmt(weight) else if (weight == -1) "ERR" else "0"
@@ -372,7 +374,7 @@ private fun TrayTile(
                     else -> subFg
                 }
                 Text(text, color = color, fontSize = big.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Clip)
-                if (weight >= 0 && maxWidth > 95.dp) Text(" g", color = subFg, fontSize = small.sp, modifier = Modifier.padding(bottom = 3.dp))
+                if (weight >= 0 && showUnit) Text(" g", color = subFg, fontSize = small.sp, modifier = Modifier.padding(bottom = 3.dp))
             }
             val frac = if (weight > 0) (weight / 1000f).coerceIn(0f, 1f) else 0f
             Box(
