@@ -13,10 +13,8 @@ HC-06/HC-05 블루투스 + 아두이노로 들어오는 12채널 무게를 받�
 (안드로이드 규칙상 완전 무확인 설치는 보장되지 않습니다.)
 
 ## 배포 방법
-```
-git tag v0.1.1 && git push origin v0.1.1
-```
-태그를 푸시하면 GitHub Actions 가 테스트 → 서명 → APK 빌드 → Release 업로드까지 합니다.
+`version.txt` 의 숫자(예: 0.1.1)를 올리고 main 에 푸시하면 됩니다. 태그는 Actions 가 자동 생성합니다.
+GitHub Actions 가 테스트 → 서명 → APK 빌드 → Release 업로드까지 합니다.
 버전 코드는 `X*10000 + Y*100 + Z` 입니다.
 
 ### 최초 1회 설정 (Settings → Secrets and variables → Actions)
