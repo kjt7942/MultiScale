@@ -1,23 +1,15 @@
-// MultiScale 테스트용 시뮬레이터 (Arduino Uno / Mega 2560 + HC-06)  펌웨어 v0.5.1
+// MultiScale 테스트용 시뮬레이터 (Arduino Uno + HC-06; Mega 는 ../mega_simulator)  펌웨어 v0.5.0
 // 배선: HC-06 TX -> D2, HC-06 RX -> D3(분압 권장), VCC 5V, GND
 // 동작:
 //  - 12개 저울에 500~1000g 랜덤 무게를 채워 0.3초마다 <w1,...,w12> 로 보낸다.
 //  - 앱이 <E3> 또는 <E1,2,3> 을 보내면 해당 저울을 0g 으로 비운다.
 //  - 앱이 <F3> 또는 <F1,2,3> 을 보내면 해당 저울에 새 송이(500~1000g 랜덤)를 채운다.
 //  - 스스로 채우거나 비우지 않는다. 언제 채울지는 앱이 정한다.
+#include <SoftwareSerial.h>
 
-#define FW_VERSION "v0.5.1 SIM"   // 앱 버전(MultiScale vX.Y.Z)과는 별개로 이 폴더의 펌웨어만 센다
+#define FW_VERSION "v0.5.0 SIM"   // 앱 버전(MultiScale vX.Y.Z)과는 별개로 이 폴더의 펌웨어만 센다
 
-// 블루투스(HC-06) 연결
-//  - Uno/Nano: 소프트웨어 시리얼  HC-06 TX -> D2, HC-06 RX -> D3(분압 권장)
-//  - Mega 2560: 하드웨어 시리얼1  HC-06 TX -> 19(RX1), HC-06 RX -> 18(TX1)(분압 권장)
-//    (Mega 는 D2 를 소프트웨어 시리얼 수신핀으로 쓸 수 없어서 하드웨어 시리얼을 쓴다)
-#if defined(__AVR_ATmega2560__)
-  #define bt Serial1
-#else
-  #include <SoftwareSerial.h>
-  SoftwareSerial bt(2, 3); // RX, TX
-#endif
+SoftwareSerial bt(2, 3); // RX, TX
 const uint8_t N = 12;
 const unsigned long SEND_MS = 300;
 const bool INJECT_ERR = true; // 가끔 ERR 을 섞어 앱의 보정 로직을 시험

@@ -59,7 +59,9 @@
 
 ## 펌웨어
 
-- [`firmware/uno_simulator`](firmware/uno_simulator/uno_simulator.ino): 아두이노 우노 + HC-06(소프트웨어 시리얼 2·3번, 9600). 저울 없이 12채널 랜덤 무게를 0.3초마다 보내고 `<E>`, `<F>`, `<TARE>`, `<VER>` 명령을 처리합니다. 상단의 `N` 상수로 채널 수를 바꿀 수 있습니다. USB 시리얼(115200)에는 받은 명령(`RX …`)이 출력됩니다.
+- [`firmware/uno_simulator`](firmware/uno_simulator/uno_simulator.ino): **아두이노 우노** + HC-06(소프트웨어 시리얼 2·3번, 9600).
+- [`firmware/mega_simulator`](firmware/mega_simulator/mega_simulator.ino): **아두이노 메가 2560** + HC-06(하드웨어 시리얼1: HC-06 TX→19, RX→18). 메가는 D2 를 소프트웨어 시리얼 수신핀으로 쓸 수 없어 우노용과 따로 둡니다.
+- 두 스케치 모두 같은 프로토콜로 12채널 랜덤 무게를 보냅니다. 저울 없이 12채널 랜덤 무게를 0.3초마다 보내고 `<E>`, `<F>`, `<TARE>`, `<VER>` 명령을 처리합니다. 상단의 `N` 상수로 채널 수를 바꿀 수 있습니다. USB 시리얼(115200)에는 받은 명령(`RX …`)이 출력됩니다.
 
 ## 하드웨어 설계 방향 (검토 결과)
 
