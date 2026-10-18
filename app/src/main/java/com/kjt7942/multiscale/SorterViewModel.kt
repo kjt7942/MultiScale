@@ -64,6 +64,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
 
     private var lastLed: List<Int>? = null
     private var lastLedSentMs = 0L
+    private var autoInstallTried = false
     private var lastDataMs = 0L
     private var staleFed = false
     private var connected = false
@@ -101,6 +102,17 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
                 if (connected && !demo && lastDataMs > 0 && now - lastDataMs > 3000 && !staleFed) {
                     staleFed = true
                     process(IntArray(CHANNELS) { -1 })
+                }
+                // 내려받은 새 버전은 작업 중(조합 잠금)이 아닐 때 자동으로 설치를 시작한다.
+                if (readyApk != null && !autoInstallTried && !ui.comboLocked && updater.canInstall()) {
+                    autoInstallTried = true
+                    showMessage("새 버전을 설치합니다.\n설치 후 앱을 다시 열어주세요.", 4000)
+                    delay(1500)
+                    try {
+                        updater.install(readyApk!!)
+                    } catch (e: Exception) {
+                        showMessage("자동 설치 실패: ${e.message}", 4000)
+                    }
                 }
                 // LED(=조합) 표시는 바뀔 때만 보내므로, 블루투스에서 한 번 유실돼도 복구되게 2초마다 다시 보낸다.
                 val led = lastLed
@@ -431,6 +443,7 @@ class SorterViewModel(app: Application) : AndroidViewModel(app), BluetoothLink.L
                         }
                     }
                     readyApk = file
+                    autoInstallTried = false
                     ui = ui.copy(updateReadyTag = r.tag, updateStatus = "새 버전 ${r.tag} 설치 준비 완료")
                 }
             } catch (e: Exception) {
